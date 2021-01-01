@@ -1,5 +1,9 @@
-This script [tensorizes](https://github.com/aguirre-lab/ml4c3/wiki/Tensorization) ECG XML files to HD5 files named by that patient's MRN, then plots all ECGs.
+## About
+This script converts ECG XML files to HD5 files named by MRN, then plots all ECGs as either PDFs or PNGs. The plots look like clinical 12-lead ECGs.
 
+Developed by [@erikr](https://github.com/erikr) and the `ml4c3` team.
+
+## Setup
 1. Clone repo
     ```
     git clone git@github.com:aguirre-lab/plot-ecg.git
@@ -20,4 +24,13 @@ This script [tensorizes](https://github.com/aguirre-lab/ml4c3/wiki/Tensorization
     --ext  pdf
     ```
 
-You can convert ECGs as PDFs (`--ext pdf`) or PNGs (`--ext png`).
+    ![](plot.gif)
+
+    > Data shown in the above recording are deidentified.
+
+    You can convert ECGs as PDFs (`--ext pdf`) or PNGs (`--ext png`).
+
+## Disclaimer
+This repo is *not* actively maintained and does not come with any guarantees for compatibility, correctness, or performance.
+
+A more robust pipeline for working with complex physiological data is available and actively maintained at [`aguirre-lab/ml4c3`](https://github.com/aguirre-lab/ml4c3).
