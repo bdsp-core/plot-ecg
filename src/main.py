@@ -1,6 +1,8 @@
 import argparse
 from timeit import default_timer as timer
+
 from arguments import parse_args
+from plots import plot_ecg
 from tensorizer import tensorize
 
 
@@ -10,6 +12,8 @@ def run(args: argparse.Namespace):
         xml=args.xml,
         hd5=args.hd5,
     )
+    plot_ecg(args=args)
+
     end_time = timer()
     elapsed_time = end_time - start_time
     print(f"Finished operation in {elapsed_time:.2f} sec")

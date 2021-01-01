@@ -1,23 +1,22 @@
 # Imports: standard library
+import base64
+import multiprocessing
 import os
 import re
-import base64
 import shutil
 import struct
-import multiprocessing
-from tqdm import tqdm
-from typing import Dict, List, Tuple, Union
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
+from typing import Dict, List, Tuple, Union
 
 # Imports: third party
 import bs4
 import h5py
 import numpy as np
+from tqdm import tqdm
 
 # Imports: first party
-from definitions import MUSE_ECG_XML_MRN_COLUMN, XML_EXT, HD5_EXT
-
+from definitions import HD5_EXT, MUSE_ECG_XML_MRN_COLUMN, XML_EXT
 
 excluded_keys = {
     "acquisitiondate",
@@ -382,54 +381,55 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
 
     # If all prior checks passed, write hd5 group for ECG
     if convert:
-        gp = hd5.create_group(ecg_dt)
+        if ecg_dt not in hd5:
+            gp = hd5.create_group(ecg_dt)
 
-        # Save voltage leads
-        voltage = ecg_data.pop("voltage")
-        for lead in voltage:
-            _compress_and_save_data(
-                hd5=gp,
-                name=lead,
-                data=voltage[lead].astype("int16"),
-            )
+            # Save voltage leads
+            voltage = ecg_data.pop("voltage")
+            for lead in voltage:
+                _compress_and_save_data(
+                    hd5=gp,
+                    name=lead,
+                    data=voltage[lead].astype("int16"),
+                )
 
-        # Save everything else
-        for key in ecg_data:
-            if key in excluded_keys:
-                continue
-            _compress_and_save_data(hd5=gp, name=key, data=ecg_data[key])
+            # Save everything else
+            for key in ecg_data:
+                if key in excluded_keys:
+                    continue
+                _compress_and_save_data(hd5=gp, name=key, data=ecg_data[key])
 
-        # Clean Patient MRN to only numbers
-        key_mrn_clean = "patientid_clean"
-        if "patientid" in ecg_data:
-            mrn_clean = _clean_mrn(ecg_data["patientid"], fallback="")
-            _compress_and_save_data(
-                hd5=gp,
-                name=key_mrn_clean,
-                data=mrn_clean,
-            )
+            # Clean Patient MRN to only numbers
+            key_mrn_clean = "patientid_clean"
+            if "patientid" in ecg_data:
+                mrn_clean = _clean_mrn(ecg_data["patientid"], fallback="")
+                _compress_and_save_data(
+                    hd5=gp,
+                    name=key_mrn_clean,
+                    data=mrn_clean,
+                )
 
-        # Clean cardiologist read
-        key_read_md = "diagnosis_md"
-        key_read_md_clean = "read_md_clean"
-        if key_read_md in ecg_data:
-            read_md_clean = _clean_read_text(text=ecg_data[key_read_md])
-            _compress_and_save_data(
-                hd5=gp,
-                name=key_read_md_clean,
-                data=read_md_clean,
-            )
+            # Clean cardiologist read
+            key_read_md = "diagnosis_md"
+            key_read_md_clean = "read_md_clean"
+            if key_read_md in ecg_data:
+                read_md_clean = _clean_read_text(text=ecg_data[key_read_md])
+                _compress_and_save_data(
+                    hd5=gp,
+                    name=key_read_md_clean,
+                    data=read_md_clean,
+                )
 
-        # Clean MUSE read
-        key_read_pc = "diagnosis_pc"
-        key_read_pc_clean = "read_pc_clean"
-        if key_read_pc in ecg_data:
-            read_pc_clean = _clean_read_text(text=ecg_data[key_read_pc])
-            _compress_and_save_data(
-                hd5=gp,
-                name=key_read_pc_clean,
-                data=read_pc_clean,
-            )
+            # Clean MUSE read
+            key_read_pc = "diagnosis_pc"
+            key_read_pc_clean = "read_pc_clean"
+            if key_read_pc in ecg_data:
+                read_pc_clean = _clean_read_text(text=ecg_data[key_read_pc])
+                _compress_and_save_data(
+                    hd5=gp,
+                    name=key_read_pc_clean,
+                    data=read_pc_clean,
+                )
 
 
 def _convert_mrn_xmls_to_hd5(

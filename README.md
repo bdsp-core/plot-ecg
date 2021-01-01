@@ -1,4 +1,4 @@
-This script tensorizes ECG XML files to HD5, then plots them.
+This script [tensorizes](https://github.com/aguirre-lab/ml4c3/wiki/Tensorization) ECG XML files to HD5 files named by that patient's MRN, then plots all ECGs.
 
 1. Clone repo
     ```
