@@ -1,7 +1,7 @@
 ## About
 This script converts ECG XML files to HD5 files named by MRN, then plots all ECGs as either PDFs or PNGs. The plots look like clinical 12-lead ECGs.
 
-Developed by [@erikr](https://github.com/erikr) and the `ml4c3` team.
+Developed by [@erikr](https://github.com/erikr) and the [`ml4c3`](https://github.com/aguirre-lab/ml4c3) team.
 
 ## Setup
 1. Clone repo
@@ -32,5 +32,4 @@ Developed by [@erikr](https://github.com/erikr) and the `ml4c3` team.
 
 ## Disclaimer
 This repo is *not* actively maintained and does not come with any guarantees for compatibility, correctness, or performance.
-
-A more robust pipeline for working with complex physiological data is available and actively maintained at [`aguirre-lab/ml4c3`](https://github.com/aguirre-lab/ml4c3).
+Issues, bug reports, and feature requests will not be reviewed. Please feel free to fork this repo for your own purposes.
