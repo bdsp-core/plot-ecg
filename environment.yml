@@ -1,0 +1,34 @@
+name: plot-ecg
+channels:
+    - conda-forge
+    - anaconda
+    - defaults
+    - pytorch
+dependencies:
+    - python=3.8
+    - pip
+    - conda-forge::ncurses
+    - numpy
+    - pandas
+    - scipy
+    - scikit-learn
+    - matplotlib
+    - ipympl
+    - seaborn
+    - pre-commit
+    - pylint
+    - identify
+    - setuptools
+    - toml
+    - isort
+    - h5py
+    - jupyterlab
+    - ipyparallel
+    - vim
+    - nodejs
+    - tqdm
+    - pytest
+    - numcodecs
+    - pip:
+        - black
+        - modin[all]
