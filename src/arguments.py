@@ -33,7 +33,7 @@ def parse_args():
 
 def _process_args(args: argparse.Namespace):
     if not os.path.exists(args.xml):
-        raise ValueError(f"{args.xml_folder} does not exist")
+        raise ValueError(f"{args.xml} does not exist")
     if not os.path.exists(args.hd5):
         raise ValueError(f"{args.hd5} does not exist")
     if not os.path.exists(args.plot):
