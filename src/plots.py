@@ -455,6 +455,8 @@ def plot_ecg(args):
                 path = os.path.join(root, file)
                 paths.append(path)
 
+    print("\nPlotting ECGs from HD5 files")
+
     # Iterate over hd5 files
     num_ecgs = 0
     for path in tqdm(paths):
