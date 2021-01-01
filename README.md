@@ -17,4 +17,7 @@ This script [tensorizes](https://github.com/aguirre-lab/ml4c3/wiki/Tensorization
     --xml  /path/to/existing/xmls \
     --hd5  /path/to/new/hd5s \
     --plot /path/to/new/plots
+    --ext  pdf
     ```
+
+You can convert ECGs as PDFs (`--ext pdf`) or PNGs (`--ext png`).
