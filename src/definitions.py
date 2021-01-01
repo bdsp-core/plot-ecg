@@ -1,5 +1,5 @@
 PDF_EXT = ".pdf"
-TENSOR_EXT = ".hd5"
+HD5_EXT = ".hd5"
 XML_EXT = ".xml"
 MUSE_ECG_XML_MRN_COLUMN = "PatientID"
 ECG_PREFIX = "ecg"

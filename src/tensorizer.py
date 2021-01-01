@@ -4,9 +4,8 @@ import re
 import base64
 import shutil
 import struct
-import logging
-import argparse
 import multiprocessing
+from tqdm import tqdm
 from typing import Dict, List, Tuple, Union
 from datetime import datetime
 from collections import defaultdict
@@ -17,10 +16,7 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from definitions import MUSE_ECG_XML_MRN_COLUMN
-
-def foo():
-    print(MUSE_ECG_XML_MRN_COLUMN)
+from definitions import MUSE_ECG_XML_MRN_COLUMN, XML_EXT, HD5_EXT
 
 
 excluded_keys = {
@@ -30,40 +26,35 @@ excluded_keys = {
 }
 
 
-def tensorize(args: argparse.Namespace):
+def tensorize(
+    xml: str,
+    hd5: str,
+):
     """Convert data from GE Muse XMLs into HD5 files
     One HD5 is generated per patient. One HD5 may contain multiple ECGs.
 
-    :param xml_folder: Path to folder containing ECG XML files organized in
-                       subfolders by date
-    :param tensors: Folder to populate with HD5 tensors
+    :param xml: Path to folder containing ECG XML files organized in
+           subfolders by date.
+    :param hd5: Path to folder where new HD5s will be saved.
 
     :return: None
     """
-
-    if not os.path.exists(args.bad_xml_dir):
-        os.mkdir(args.bad_xml_dir)
-        logging.info(f"Created {args.bad_xml_dir}")
-
-    if not os.path.exists(args.bad_hd5_dir):
-        os.mkdir(args.bad_hd5_dir)
-        logging.info(f"Created {args.bad_hd5_dir}")
-
-    logging.info("Mapping XMLs to MRNs")
+    print("Mapping XMLs to MRNs")
     mrn_xmls_map = _get_mrn_xmls_map(
-        xml_folder=args.xml_folder,
-        num_workers=args.num_workers,
+        xml_folder=xml,
         mrn_key_in_xml=MUSE_ECG_XML_MRN_COLUMN,
     )
 
-    logging.info("Converting XMLs into HD5s")
-    _convert_mrn_xmls_to_hd5_wrapper(
-        mrn_xmls_map=mrn_xmls_map,
-        dir_hd5=args.tensors,
-        num_workers=args.num_workers,
-        bad_xml_dir=args.bad_xml_dir,
-        bad_hd5_dir=args.bad_hd5_dir,
-    )
+    print("Converting XMLs into HD5s")
+    tot_xml = sum([len(v) for k, v in mrn_xmls_map.items()])
+
+    for mrn, fpath_xmls in tqdm(mrn_xmls_map.items()):
+        _convert_mrn_xmls_to_hd5(
+            mrn=mrn,
+            fpath_xmls=fpath_xmls,
+            hd5=hd5,
+            hd5_prefix="ecg",
+        )
 
 
 def _get_mrn_from_xml(
@@ -76,13 +67,12 @@ def _get_mrn_from_xml(
             if match:
                 mrn = _clean_mrn(match.group(1), fallback="bad_mrn")
                 return (mrn, fpath_xml)
-    logging.warning(f"No PatientID found at {fpath_xml}")
+    print(f"No PatientID found at {fpath_xml}")
     return None
 
 
 def _get_mrn_xmls_map(
     xml_folder: str,
-    num_workers: int,
     mrn_key_in_xml: str,
 ) -> Dict[str, List[str]]:
     fpath_xmls = []
@@ -91,35 +81,26 @@ def _get_mrn_xmls_map(
             if os.path.splitext(file)[-1].lower() != XML_EXT:
                 continue
             fpath_xmls.append(os.path.join(root, file))
-    logging.info(f"Found {len(fpath_xmls)} XMLs at {xml_folder}")
+    print(f"Found {len(fpath_xmls)} XMLs at {xml_folder}")
 
     mrn_xml_list = []
 
-    if num_workers == 1:
-        for fpath_xml in fpath_xmls:
-            mrn_xml_list.append(
-                _get_mrn_from_xml(fpath_xml=fpath_xml, mrn_key_in_xml=mrn_key_in_xml),
-            )
-    else:
-        with multiprocessing.Pool(processes=num_workers) as pool:
-            mrn_xml_list = pool.starmap(
-                _get_mrn_from_xml,
-                [(fpath_xml, mrn_key_in_xml) for fpath_xml in fpath_xmls],
-            )
+    for fpath_xml in fpath_xmls:
+        mrn_xml_list.append(
+            _get_mrn_from_xml(fpath_xml=fpath_xml, mrn_key_in_xml=mrn_key_in_xml),
+        )
 
     # Build dict of MRN to XML files with that MRN
     mrn_xml_dict = defaultdict(list)
     for mrn_xml in mrn_xml_list:
         if mrn_xml:
             mrn_xml_dict[mrn_xml[0]].append(mrn_xml[1])
-    logging.info(f"Found {len(mrn_xml_dict)} distinct MRNs")
+    print(f"Found {len(mrn_xml_dict)} distinct MRNs")
 
     return mrn_xml_dict
 
 
 def _clean_mrn(mrn: str, fallback: str) -> str:
-    # TODO additional cleaning like o->0, |->1
-    # TODO https://github.com/aguirre-lab/ml4c3/issues/577
     try:
         clean = re.sub(r"[^0-9]", "", mrn)
         clean = int(clean)
@@ -127,7 +108,7 @@ def _clean_mrn(mrn: str, fallback: str) -> str:
             raise ValueError()
         return str(clean)
     except ValueError:
-        logging.warning(
+        print(
             f'Could not clean MRN "{mrn}" to an int. Falling back to "{fallback}".',
         )
         return fallback
@@ -341,7 +322,7 @@ def _get_voltage_from_lead_tags(
         lead_data["voltage"] = voltage
         return lead_data
     except (AssertionError, AttributeError, ValueError) as e:
-        logging.exception(e)
+        print(e)
         return dict()
 
 
@@ -350,9 +331,7 @@ def _compress_and_save_data(
     name: str,
     data: Union[str, np.ndarray],
 ) -> h5py.Dataset:
-    compression = None
-    if isinstance(data, np.ndarray):
-        compression = 32015
+    compression = "gzip" if isinstance(data, np.ndarray) else None
     return hd5.create_dataset(name=name, data=data, compression=compression)
 
 
@@ -367,7 +346,7 @@ def _get_max_voltage(voltage: Dict[str, np.ndarray]) -> float:
 def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
     # Return 1 if converted, 0 if ecg was bad or -1 if ecg was a duplicate
     # Set flag to check if we should convert to hd5
-    convert = 1
+    convert = True
 
     # Extract data from XML into dict
     ecg_data = _data_from_xml(fpath_xml)
@@ -380,29 +359,29 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
     # If XML is empty, remove the XML file and do not convert
     if os.stat(fpath_xml).st_size == 0 or not ecg_data:
         os.remove(fpath_xml)
-        convert = 0
-        logging.warning(f"Conversion of {fpath_xml} failed! XML is empty.")
+        convert = False
+        print(f"Conversion of {fpath_xml} failed! XML is empty.")
 
     # If patient already has an ECG at given date and time, skip duplicate
     elif ecg_dt in hd5.keys():
-        logging.warning(
+        print(
             f"Conversion of {fpath_xml} skipped. Converted XML already exists in HD5.",
         )
         convert = -1
 
     # If we could not get voltage, do not convert (see _get_voltage_from_lead_tags)
     elif "voltage" not in ecg_data:
-        logging.warning(
+        print(
             f"Conversion of {fpath_xml} failed! Voltage is empty or badly formatted.",
         )
-        convert = 0
+        convert = False
     # If the max voltage value is 0, do not convert
     elif _get_max_voltage(ecg_data["voltage"]) == 0:
-        logging.warning(f"Conversion of {fpath_xml} failed! Maximum voltage is 0.")
-        convert = 0
+        print(f"Conversion of {fpath_xml} failed! Maximum voltage is 0.")
+        convert = False
 
     # If all prior checks passed, write hd5 group for ECG
-    if convert == 1:
+    if convert:
         gp = hd5.create_group(ecg_dt)
 
         # Save voltage leads
@@ -452,114 +431,35 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
                 data=read_pc_clean,
             )
 
-        logging.info(f"Wrote {fpath_xml} to {fpath_hd5}")
-    return convert
-
-
-def _move_bad_files(
-    fpath_xmls: List[str],
-    fpath_hd5: str,
-    bad_xml_dir: str,
-    bad_hd5_dir: str,
-):
-    # Move XMLs
-    for fpath_xml in fpath_xmls:
-        basename = os.path.basename(fpath_xml)
-        newpath = os.path.join(bad_xml_dir, "xml", basename)
-        shutil.move(src=fpath_xml, dst=newpath)
-        logging.info(f"Moved bad XML to {newpath}")
-
-    # Move HD5
-    basename = os.path.basename(fpath_hd5)
-    newpath = os.path.join(bad_hd5_dir, "hd5", basename)
-    shutil.move(src=fpath_hd5, dst=newpath)
-    logging.info(f"Moved bad HD5 to {newpath}")
-
 
 def _convert_mrn_xmls_to_hd5(
     mrn: str,
     fpath_xmls: List[str],
-    dir_hd5: str,
+    hd5: str,
     hd5_prefix: str,
-    bad_xml_dir: str,
-    bad_hd5_dir: str,
 ) -> Tuple[int, int, int]:
-    fpath_hd5 = os.path.join(dir_hd5, f"{mrn}{TENSOR_EXT}")
-    num_xml_converted = 0
-    num_dupe_skipped = 0
-    num_src_in_hd5 = 0
-    num_ecg_in_hd5 = 0
-    hd5_failure = 0
-
-    try:
-        with h5py.File(fpath_hd5, "a") as hd5:
-            hd5_ecg = (
-                hd5[hd5_prefix]
-                if hd5_prefix in hd5.keys()
-                else hd5.create_group(hd5_prefix)
-            )
-            for fpath_xml in fpath_xmls:
-                converted = _convert_xml_to_hd5(fpath_xml, fpath_hd5, hd5_ecg)
-                if converted == 1:
-                    num_xml_converted += 1
-                elif converted == -1:
-                    num_dupe_skipped += 1
-            num_ecg_in_hd5 = len(hd5_ecg.keys())
-
-            # If there are no ECGs in HD5, delete ECG group
-            # There may be prior ECGs in HD5
-            # num_xml_converted != num_ecg_in_hd5
-            if not num_ecg_in_hd5:
-                del hd5[hd5_prefix]
-
-            num_src_in_hd5 = len(hd5.keys())
-
-        if not num_src_in_hd5:
-            # If there is no other data in HD5, delete HD5
-            try:
-                os.remove(fpath_hd5)
-            except:
-                logging.warning(f"Could not delete empty HD5 at {fpath_hd5}")
-        num_hd5_written = 1 if num_xml_converted else 0
-    except Exception as e:
-        logging.warning(e)
-        _move_bad_files(
-            fpath_xmls=fpath_xmls,
-            fpath_hd5=fpath_hd5,
-            bad_xml_dir=bad_xml_dir,
-            bad_hd5_dir=bad_hd5_dir,
+    fpath_hd5 = os.path.join(hd5, f"{mrn}{HD5_EXT}")
+    with h5py.File(fpath_hd5, "a") as hd5:
+        hd5_ecg = (
+            hd5[hd5_prefix]
+            if hd5_prefix in hd5.keys()
+            else hd5.create_group(hd5_prefix)
         )
-        num_hd5_written = 0
-        hd5_failure = 1
+        for fpath_xml in fpath_xmls:
+            converted = _convert_xml_to_hd5(fpath_xml, fpath_hd5, hd5_ecg)
+        num_ecg_in_hd5 = len(hd5_ecg.keys())
 
-    return (num_hd5_written, num_xml_converted, num_dupe_skipped, hd5_failure)
+        # If there are no ECGs in HD5, delete ECG group
+        # There may be prior ECGs in HD5
+        # num_xml_converted != num_ecg_in_hd5
+        if not num_ecg_in_hd5:
+            del hd5[hd5_prefix]
 
+        num_src_in_hd5 = len(hd5.keys())
 
-def _convert_mrn_xmls_to_hd5_wrapper(
-    mrn_xmls_map: Dict[str, List[str]],
-    dir_hd5: str,
-    num_workers: int,
-    bad_xml_dir: str,
-    bad_hd5_dir: str,
-    hd5_prefix: str = "ecg",
-):
-    tot_xml = sum([len(v) for k, v in mrn_xmls_map.items()])
-    os.makedirs(dir_hd5, exist_ok=True)
-
-    with multiprocessing.Pool(processes=num_workers) as pool:
-        counts = pool.starmap(
-            _convert_mrn_xmls_to_hd5,
-            [
-                (mrn, fpath_xmls, dir_hd5, hd5_prefix, bad_xml_dir, bad_hd5_dir)
-                for mrn, fpath_xmls in mrn_xmls_map.items()
-            ],
-        )
-    num_hd5 = sum([x[0] for x in counts])
-    num_xml = sum([x[1] for x in counts])
-    num_dup = sum([x[2] for x in counts])
-    num_hd5_failures = sum([x[3] for x in counts])
-
-    logging.info(f"Converted {num_xml} XMLs to {num_hd5} HD5s at {dir_hd5}")
-    logging.info(f"Skipped {num_dup} duplicate XMLs")
-    logging.info(f"Skipped {tot_xml - num_dup - num_xml} malformed XMLs")
-    logging.info(f"Moved {num_hd5_failures} bad HD5 files to {bad_hd5_dir}")
+    if not num_src_in_hd5:
+        # If there is no other data in HD5, delete HD5
+        try:
+            os.remove(fpath_hd5)
+        except:
+            print(f"Could not delete empty HD5 at {fpath_hd5}")

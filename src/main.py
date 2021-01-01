@@ -1,17 +1,19 @@
 import argparse
 from timeit import default_timer as timer
-from tensorizer import tensorize, foo
+from arguments import parse_args
+from tensorizer import tensorize
+
 
 def run(args: argparse.Namespace):
     start_time = timer()
-    try:
-        foo()
-    except Exception as e:
-        print(f"Exception occured: {e}")
-
+    tensorize(
+        xml=args.xml,
+        hd5=args.hd5,
+    )
     end_time = timer()
     elapsed_time = end_time - start_time
     print(f"Finished operation in {elapsed_time:.2f} sec")
+
 
 if __name__ == "__main__":
     args = parse_args()

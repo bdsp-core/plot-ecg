@@ -11,3 +11,6 @@ dependencies:
     - matplotlib
     - ipympl
     - h5py
+    - bs4
+    - lxml
+    - tqdm
