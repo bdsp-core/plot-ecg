@@ -12,6 +12,11 @@ def parse_args():
         help="",
     )
     parser.add_argument(
+        "--ext",
+        default="png",
+        help="",
+    )
+    parser.add_argument(
         "--plot",
         type=str,
         help="",

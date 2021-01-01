@@ -23,75 +23,6 @@ matplotlib.use("Agg")  # isort:skip
 from matplotlib import pyplot as plt  # isort:skip
 # fmt: on
 
-SUBPLOT_SIZE = 8
-
-COLOR_ARRAY = [
-    "tan",
-    "indigo",
-    "cyan",
-    "pink",
-    "purple",
-    "blue",
-    "chartreuse",
-    "deepskyblue",
-    "green",
-    "salmon",
-    "aqua",
-    "magenta",
-    "aquamarine",
-    "red",
-    "coral",
-    "tomato",
-    "grey",
-    "black",
-    "maroon",
-    "hotpink",
-    "steelblue",
-    "orange",
-    "papayawhip",
-    "wheat",
-    "chocolate",
-    "darkkhaki",
-    "gold",
-    "orange",
-    "crimson",
-    "slategray",
-    "violet",
-    "cadetblue",
-    "midnightblue",
-    "darkorchid",
-    "paleturquoise",
-    "plum",
-    "lime",
-    "teal",
-    "peru",
-    "silver",
-    "darkgreen",
-    "rosybrown",
-    "firebrick",
-    "saddlebrown",
-    "dodgerblue",
-    "orangered",
-]
-
-ECG_REST_PLOT_DEFAULT_YRANGE = 3.0
-ECG_REST_PLOT_MAX_YRANGE = 10.0
-ECG_REST_PLOT_LEADS = [
-    ["strip_I", "strip_aVR", "strip_V1", "strip_V4"],
-    ["strip_II", "strip_aVL", "strip_V2", "strip_V5"],
-    ["strip_III", "strip_aVF", "strip_V3", "strip_V6"],
-]
-ECG_REST_PLOT_MEDIAN_LEADS = [
-    ["median_I", "median_aVR", "median_V1", "median_V4"],
-    ["median_II", "median_aVL", "median_V2", "median_V5"],
-    ["median_III", "median_aVF", "median_V3", "median_V6"],
-]
-ECG_REST_PLOT_AMP_LEADS = [
-    [0, 3, 6, 9],
-    [1, 4, 7, 10],
-    [2, 5, 8, 11],
-]
-
 
 def _plot_ecg_text(
     data: dict,
@@ -101,13 +32,14 @@ def _plot_ecg_text(
 ) -> None:
     # top text
     dt = datetime.strptime(data["datetime"], ECG_DATETIME_FORMAT)
-    dob = data["dob"]
+    dob = data["dateofbirth"]
     if dob != "":
         dob = datetime.strptime(dob, ECG_DATE_FORMAT)
         dob = f"{dob:%d-%b-%Y}".upper()
-    age = -1
-    if not np.isnan(data["age"]):
-        age = int(data["age"])
+    try:
+        age = int(data["patientage"])
+    except:
+        age = -1
 
     fig.text(
         0.17 / w,
@@ -120,7 +52,7 @@ def _plot_ecg_text(
     fig.text(6.05 / w, 8.04 / h, f"{data['sitename']}", weight="bold")
 
     fig.text(0.17 / w, 7.77 / h, f"{dob} ({age} yr)", weight="bold")
-    fig.text(0.17 / w, 7.63 / h, f"{data['sex']}".title(), weight="bold")
+    fig.text(0.17 / w, 7.63 / h, f"{data['gender']}".title(), weight="bold")
     fig.text(0.17 / w, 7.35 / h, "Room: ", weight="bold")
     fig.text(0.17 / w, 7.21 / h, f"Loc: {data['location']}", weight="bold")
 
@@ -130,13 +62,23 @@ def _plot_ecg_text(
     fig.text(2.15 / w, 7.35 / h, "QT/QTc", weight="bold")
     fig.text(2.15 / w, 7.21 / h, "P-R-T axes", weight="bold")
 
-    fig.text(3.91 / w, 7.77 / h, f"{int(data['rate_md'])}", weight="bold", ha="right")
-    fig.text(3.91 / w, 7.63 / h, f"{int(data['pr_md'])}", weight="bold", ha="right")
-    fig.text(3.91 / w, 7.49 / h, f"{int(data['qrs_md'])}", weight="bold", ha="right")
+    fig.text(
+        3.91 / w,
+        7.77 / h,
+        f"{int(data['ventricularrate_md'])}",
+        weight="bold",
+        ha="right",
+    )
+    fig.text(
+        3.91 / w, 7.63 / h, f"{int(data['printerval_md'])}", weight="bold", ha="right"
+    )
+    fig.text(
+        3.91 / w, 7.49 / h, f"{int(data['qrsduration_md'])}", weight="bold", ha="right"
+    )
     fig.text(
         3.91 / w,
         7.35 / h,
-        f"{int(data['qt_md'])}/{int(data['qtc_md'])}",
+        f"{int(data['qtinterval_md'])}/{int(data['qtcorrected_md'])}",
         weight="bold",
         ha="right",
     )
@@ -154,7 +96,7 @@ def _plot_ecg_text(
     fig.text(4.30 / w, 7.35 / h, "ms", weight="bold", ha="right")
     fig.text(4.30 / w, 7.21 / h, f"{int(data['taxis_md'])}", weight="bold", ha="right")
 
-    fig.text(4.75 / w, 7.21 / h, f"{data['read_md']}", wrap=True, weight="bold")
+    fig.text(4.75 / w, 7.21 / h, f"{data['read_md_clean']}", wrap=True, weight="bold")
 
     fig.text(1.28 / w, 6.65 / h, f"Technician: {''}", weight="bold")
     fig.text(1.28 / w, 6.51 / h, f"Test ind: {''}", weight="bold")
@@ -342,6 +284,14 @@ def _plot_ecg_clinical(voltage: Dict[str, np.ndarray], ax: plt.Axes) -> None:
             )
 
 
+def resample_ecg_voltage(voltage: np.array, desired_length: int) -> np.array:
+    num_samples_original = len(voltage)
+    x = np.arange(num_samples_original)
+    x_interp = np.linspace(0, num_samples_original, desired_length)
+    x_new = np.interp(x_interp, x, voltage)
+    return x_new
+
+
 def _hf_to_dict(hf) -> dict:
     keys = [
         "patientid",
@@ -361,6 +311,18 @@ def _hf_to_dict(hf) -> dict:
         "paxis_md",
         "raxis_md",
         "qtcorrected_md",
+    ]
+    ecg_data_dict = dict()
+    for key in keys:
+        if key in hf:
+            if len(hf[key].shape) == 0:
+                ecg_data_dict[key] = hf[key][()]
+            else:
+                ecg_data_dict[key] = hf[key][:]
+        else:
+            ecg_data_dict[key] = None
+
+    leads = [
         "I",
         "II",
         "III",
@@ -374,15 +336,13 @@ def _hf_to_dict(hf) -> dict:
         "V5",
         "V6",
     ]
-    ecg_data_dict = dict()
-    for key in keys:
-        if key in hf:
-            if len(hf[key].shape) == 0:
-                ecg_data_dict[key] = hf[key][()]
-            else:
-                ecg_data_dict[key] = hf[key][:]
+    for lead in leads:
+        if lead in hf:
+            tensor = hf[lead][:]
+            tensor = resample_ecg_voltage(voltage=tensor, desired_length=2500)
+            ecg_data_dict[lead] = tensor
         else:
-            ecg_data_dict[key] = None
+            ecg_data_dict[lead] = np.zeros((2500))
 
     dt = hf.name.replace("/ecg/", "")
     ecg_data_dict["datetime"] = dt
@@ -392,10 +352,9 @@ def _hf_to_dict(hf) -> dict:
 def _plot_ecg_figure(
     ecg_hd5_object: h5py._hl.group.Group,
     output_folder: str,
+    extension: str,
 ) -> int:
     ecg_data_dict = _hf_to_dict(hf=ecg_hd5_object)
-
-    breakpoint()
 
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["font.size"] = 9.5
@@ -460,8 +419,7 @@ def _plot_ecg_figure(
     ax.grid(b=True, color="r", which="minor", lw=0.2)
 
     # signal plot
-    voltage = data["2500"]
-    plot_signal_function(voltage, ax)
+    _plot_ecg_clinical(voltage=ecg_data_dict, ax=ax)
 
     # bottom text
     fig.text(
@@ -473,11 +431,19 @@ def _plot_ecg_figure(
         weight="bold",
     )
 
-    title = re.sub(r"[:/. ]", "", f'{patient_id}_{data["datetime"]}')
-    fpath = os.path.join(output_folder, f"{title}.png")
-    plt.savefig(fpath)
+    mrn = ecg_data_dict["patientid"]
+    dt = ecg_data_dict["datetime"]
+    title = re.sub(r"[:/. ]", "", f"{mrn}_{dt}")
+    fpath = os.path.join(output_folder, f"{title}.{extension}")
+
+    if extension == "pdf":
+        plt.savefig(fpath)
+    elif extension == "png":
+        plt.savefig(fpath, dpi=150)
+    else:
+        raise ValueError("Invalid extension. Choose pdf or png.")
     plt.close(fig)
-    return fpath
+    return 1
 
 
 def plot_ecg(args):
@@ -497,7 +463,9 @@ def plot_ecg(args):
             for ecg_datetime in ecg_datetimes:
                 ecg_hd5_object = hf[f"{ECG_PREFIX}/{ecg_datetime}"]
                 outcome = _plot_ecg_figure(
-                    ecg_hd5_object=ecg_hd5_object, output_folder=args.plot
+                    ecg_hd5_object=ecg_hd5_object,
+                    output_folder=args.plot,
+                    extension=args.ext,
                 )
                 num_ecgs += outcome
-    print(f"Saved {num_ecgs} ECGs from {len(paths)} HD5 files to {args.plot}")
+    print(f"Plotted {num_ecgs} ECG(s) from {len(paths)} HD5 file(s) to {args.plot}")
