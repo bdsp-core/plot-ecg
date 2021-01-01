@@ -32,7 +32,7 @@ def _plot_ecg_text(
 ) -> None:
     # top text
     dt = datetime.strptime(data["datetime"], ECG_DATETIME_FORMAT)
-    dob = data["dateofbirth"]
+    dob = str(data["dateofbirth"], 'utf-8')
     if dob != "":
         dob = datetime.strptime(dob, ECG_DATE_FORMAT)
         dob = f"{dob:%d-%b-%Y}".upper()
@@ -431,7 +431,7 @@ def _plot_ecg_figure(
         weight="bold",
     )
 
-    mrn = ecg_data_dict["patientid"]
+    mrn = str(ecg_data_dict["patientid"], 'utf-8')
     dt = ecg_data_dict["datetime"]
     title = re.sub(r"[:/. ]", "", f"{mrn}_{dt}")
     fpath = os.path.join(output_folder, f"{title}.{extension}")
